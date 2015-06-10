@@ -1,0 +1,93 @@
+<!--
+/*
+ * Copyright 2015 Jeffrey Bosboom
+ * This file is part of svg-tiler.
+ *
+ * svg-tiler is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * svg-tiler is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with svg-tiler. If not, see <http://www.gnu.org/licenses/>.
+ */
+ -->
+
+<project name="svg-tiler" basedir="." default="jar"
+	xmlns:if="ant:if" xmlns:unless="ant:unless"
+>
+	<target name="fetch">
+		<mkdir dir="lib"/>
+		<mkdir dir="lib/doc"/>
+		<mkdir dir="lib/src"/>
+
+		<get src="http://search.maven.org/remotecontent?filepath=com/google/guava/guava/18.0/guava-18.0.jar"
+			 dest="lib/guava.jar"
+			 skipexisting="true"/>
+		<get src="http://search.maven.org/remotecontent?filepath=com/google/guava/guava/18.0/guava-18.0-javadoc.jar"
+			 dest="lib/doc/guava-doc.jar"
+			 skipexisting="true"/>
+		<get src="http://search.maven.org/remotecontent?filepath=com/google/guava/guava/18.0/guava-18.0-sources.jar"
+			 dest="lib/src/guava-src.jar"
+			 skipexisting="true"/>
+
+		<get src="https://search.maven.org/remotecontent?filepath=net/sf/jopt-simple/jopt-simple/4.9-beta-1/jopt-simple-4.9-beta-1.jar"
+			 dest="lib/joptsimple.jar"
+			 skipexisting="true"/>
+		<get src="https://search.maven.org/remotecontent?filepath=net/sf/jopt-simple/jopt-simple/4.9-beta-1/jopt-simple-4.9-beta-1-javadoc.jar"
+			 dest="lib/doc/joptsimple-doc.jar"
+			 skipexisting="true"/>
+		<get src="https://search.maven.org/remotecontent?filepath=net/sf/jopt-simple/jopt-simple/4.9-beta-1/jopt-simple-4.9-beta-1-sources.jar"
+			 dest="lib/src/joptsimple-src.jar"
+			 skipexisting="true"/>
+
+		<condition property="getbatik">
+			<not>
+				<available file="lib/batik.jar"/>
+			</not>
+		</condition>
+		<sequential if:true="${getbatik}">
+			<get src="http://apache.osuosl.org/xmlgraphics/batik/binaries/batik-bin-1.8.zip"
+				 dest="lib/batik.zip"/>
+			<unzip src="lib/batik.zip" dest="lib"/>
+
+			<copy file="lib/batik-1.8/batik-1.8.jar" tofile="lib/batik.jar"/>
+			<copy todir="lib">
+				<fileset dir="lib/batik-1.8/lib">
+					<include name="*.jar"/>
+				</fileset>
+			</copy>
+
+			<delete dir="lib/batik-1.8"/>
+			<delete file="lib/batik.zip"/>
+		</sequential>
+	</target>
+
+	<target name="clean">
+		<delete dir="build"/>
+	</target>
+
+	<target name="compile">
+		<mkdir dir="build/classes"/>
+		<javac srcdir="src" destdir="build/classes" debug="true" includeantruntime="false">
+			<classpath>
+				<fileset dir="lib">
+					<include name="*.jar"/>
+				</fileset>
+			</classpath>
+		</javac>
+	</target>
+
+	<target name="jar" depends="compile">
+		<mkdir dir="build/jar"/>
+		<jar destfile="build/jar/svg-tiler.jar" basedir="build/classes">
+		</jar>
+	</target>
+
+	<target name="clean-build" depends="clean,jar"/>
+</project>
