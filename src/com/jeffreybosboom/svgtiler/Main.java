@@ -42,13 +42,15 @@ import org.w3c.dom.svg.SVGSVGElement;
  */
 public final class Main {
 	public static void main(String[] args) throws Throwable {
-		args = new String[]{"--mapping", "mapping.txt", "--image", "image.txt"};
 		OptionParser parser = new OptionParser();
 		ArgumentAcceptingOptionSpec<Path> mappingOpt = parser.accepts("mapping").withRequiredArg().withValuesConvertedBy(new PathValueConverter()).required();
 		ArgumentAcceptingOptionSpec<Path> imageOpt = parser.accepts("image").withRequiredArg().withValuesConvertedBy(new PathValueConverter()).required();
+		ArgumentAcceptingOptionSpec<Path> outputOpt = parser.accepts("output").withRequiredArg().withValuesConvertedBy(new PathValueConverter()).required();
 		OptionSet options = parser.parse(args);
 		Path mappingPath = options.valueOf(mappingOpt);
 		Path imagePath = options.valueOf(imageOpt);
+		Path outputPath = options.valueOf(outputOpt);
+
 		Mapping mapping = Mapping.fromFile(mappingPath);
 
 		SVGDocument doc = (SVGDocument)SVGDOMImplementation.getDOMImplementation()
@@ -81,7 +83,7 @@ public final class Main {
 		}
 
 		SVGTranscoder transcoder = new SVGTranscoder();
-		try (Writer w = Files.newBufferedWriter(Paths.get("output.svg"))) {
+		try (Writer w = Files.newBufferedWriter(outputPath)) {
 			transcoder.transcode(new TranscoderInput(doc), new TranscoderOutput(w));
 			w.flush();
 		}
