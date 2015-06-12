@@ -89,5 +89,16 @@
 		</jar>
 	</target>
 
+	<target name="dist" depends="compile">
+		<mkdir dir="build/dist"/>
+		<jar destfile="build/dist/svg-tiler.jar" basedir="build/classes"
+			compress="true" level="9">
+			<zipgroupfileset dir="lib" includes="*.jar"/>
+			<manifest>
+				<attribute name="Main-Class" value="com.jeffreybosboom.svgtiler.Main"/>
+			</manifest>
+		</jar>
+	</target>
+
 	<target name="clean-build" depends="clean,jar"/>
 </project>
