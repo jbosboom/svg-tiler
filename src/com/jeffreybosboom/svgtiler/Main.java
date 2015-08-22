@@ -17,23 +17,32 @@
  */
 package com.jeffreybosboom.svgtiler;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import joptsimple.ArgumentAcceptingOptionSpec;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.ValueConversionException;
 import joptsimple.ValueConverter;
+import org.apache.batik.anim.dom.SAXSVGDocumentFactory;
 import org.apache.batik.anim.dom.SVGDOMImplementation;
 import org.apache.batik.transcoder.TranscoderInput;
 import org.apache.batik.transcoder.TranscoderOutput;
 import org.apache.batik.transcoder.svg2svg.SVGTranscoder;
+import org.apache.batik.util.XMLResourceDescriptor;
+import org.w3c.dom.Element;
 import org.w3c.dom.svg.SVGDocument;
 import org.w3c.dom.svg.SVGSVGElement;
+import org.w3c.dom.svg.SVGSymbolElement;
 
 /**
  *
@@ -51,10 +60,9 @@ public final class Main {
 		Path imagePath = options.valueOf(imageOpt);
 		Path outputPath = options.valueOf(outputOpt);
 
-		Mapping mapping = Mapping.fromFile(mappingPath);
-
 		SVGDocument doc = (SVGDocument)SVGDOMImplementation.getDOMImplementation()
 				.createDocument(SVGDOMImplementation.SVG_NAMESPACE_URI, "svg", null);
+		Map<Character, SVGSymbolElement> symbols = parseMapping(mappingPath, doc);
 
 		int tileHeight = 50, tileWidth = 50;
 		List<String> imageLines = Files.readAllLines(imagePath);
@@ -62,23 +70,19 @@ public final class Main {
 			String line = imageLines.get(r);
 			for (int c = 0; c < line.length(); ++c) {
 				char t = line.charAt(c);
-				SVGSVGElement element = mapping.apply(t);
-				if (element == null) {
+				SVGSymbolElement symbol = symbols.get(t);
+				if (symbol == null) {
 					System.err.println("no mapping for symbol: "+t);
 					continue;
 				}
 
-				String oldHeight = element.getAttribute("height");
-				String oldWidth = element.getAttribute("width");
-
-				element.setAttributeNS(null, "x", Integer.toString(c*tileWidth));
-				element.setAttributeNS(null, "y", Integer.toString(r*tileHeight));
-				element.setAttributeNS(null, "height", Integer.toString(tileHeight));
-				element.setAttributeNS(null, "width", Integer.toString(tileWidth));
-				element.setAttributeNS(null, "viewBox", String.format("0 0 %s %s", oldWidth, oldHeight));
-				element.setAttributeNS(null, "preserveAspectRatio", "xMinYMin meet");
-				doc.adoptNode(element);
-				doc.getDocumentElement().appendChild(element);
+				Element instance = doc.createElementNS(SVGDOMImplementation.SVG_NAMESPACE_URI, "use");
+				instance.setAttributeNS("http://www.w3.org/1999/xlink", "href", "#"+symbol.getId());
+				instance.setAttributeNS(null, "x", Integer.toString(c*tileWidth));
+				instance.setAttributeNS(null, "y", Integer.toString(r*tileHeight));
+				instance.setAttributeNS(null, "height", Integer.toString(tileHeight));
+				instance.setAttributeNS(null, "width", Integer.toString(tileWidth));
+				doc.getDocumentElement().appendChild(instance);
 			}
 		}
 
@@ -87,6 +91,72 @@ public final class Main {
 			transcoder.transcode(new TranscoderInput(doc), new TranscoderOutput(w));
 			w.flush();
 		}
+	}
+
+	private static Map<Character, SVGSymbolElement> parseMapping(Path path, SVGDocument doc) throws IOException {
+		Map<Character, SVGSymbolElement> symbols = new HashMap<>();
+		int counter = 0;
+		for (String line : Files.readAllLines(path)) {
+			int fieldSep = line.indexOf(' ');
+			String symbol = line.substring(0, fieldSep);
+			if (symbol.length() != 1)
+				throw new RuntimeException("bad symbol: "+symbol);
+			String elementStr = line.substring(fieldSep+1).trim();
+
+			SVGSVGElement subdoc;
+			if (elementStr.startsWith("@")) {
+				Path svgDocPath = Paths.get(elementStr.substring(1));
+				svgDocPath = path.resolveSibling(svgDocPath);
+				try (Reader r = Files.newBufferedReader(svgDocPath)) {
+					subdoc = parseRoot(r).getRootElement();
+				}
+			} else {
+				try {
+					subdoc = parseRoot(new StringReader(elementStr)).getRootElement();
+				} catch (IOException ex) {
+					//if we're just missing the outer svg element, add one and try again
+					String message = ex.getMessage();
+					if (message.contains("Root element namespace") && message.contains("Found: null")) {
+						elementStr = "<svg xmlns=\"http://www.w3.org/2000/svg\">" + elementStr + "</svg>";
+						subdoc = parseRoot(new StringReader(elementStr)).getRootElement();
+					} else
+						throw ex;
+				}
+				if (subdoc == null) {
+					System.out.println("problem parsing element for "+symbol);
+					continue;
+				}
+			}
+			SVGSymbolElement sym = (SVGSymbolElement)doc.createElementNS(SVGDOMImplementation.SVG_NAMESPACE_URI, "symbol");
+			while (subdoc.hasChildNodes())
+				sym.appendChild(doc.adoptNode(subdoc.getFirstChild()));
+			String viewBox = subdoc.getAttribute("viewBox"), width = subdoc.getAttribute("width"),
+					height = subdoc.getAttribute("height");
+			if (!viewBox.isEmpty())
+				sym.setAttributeNS(null, "viewBox", viewBox);
+			else if (!width.isEmpty() && !height.isEmpty()) {
+				sym.setAttributeNS(null, "viewBox", String.format("0 0 %s %s", width, height));
+				System.out.println("element for "+symbol+" has no viewBox; assuming height and width are accurate");
+			} else
+				System.out.println("element for "+symbol+" has no size information");
+			sym.setId("svgtilersymbol"+(counter++));
+			doc.getDocumentElement().appendChild(sym);
+			symbols.put(symbol.charAt(0), sym);
+		}
+		return symbols;
+	}
+
+	/**
+	 * Parses an SVG document from the given string.
+	 * @param filename
+	 * @return
+	 * @throws IOException
+	 */
+	private static SVGDocument parseRoot(Reader r) throws IOException {
+		String parser = XMLResourceDescriptor.getXMLParserClassName();
+		SAXSVGDocumentFactory f = new SAXSVGDocumentFactory(parser);
+		SVGDocument doc = f.createSVGDocument("", r);
+		return doc;
 	}
 
 	private static final class PathValueConverter implements ValueConverter<Path> {
