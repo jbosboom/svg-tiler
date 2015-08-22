@@ -87,7 +87,7 @@ public final class Main {
 				doc.getDocumentElement().appendChild(instance);
 			}
 		}
-		doc.getRootElement().setAttributeNS(null, "viewBox", String.format("0 0 %s %s", (maxLineLength+1)*tileWidth, (imageLines.size()+1)*tileHeight));
+		doc.getRootElement().setAttributeNS(null, "viewBox", String.format("0 0 %s %s", maxLineLength*tileWidth, imageLines.size()*tileHeight));
 		doc.getRootElement().setAttributeNS(null, "preserveAspectRatio", "xMinYMin meet");
 
 		SVGTranscoder transcoder = new SVGTranscoder();
