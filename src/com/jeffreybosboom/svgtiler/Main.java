@@ -65,9 +65,11 @@ public final class Main {
 		Map<Character, SVGSymbolElement> symbols = parseMapping(mappingPath, doc);
 
 		int tileHeight = 50, tileWidth = 50;
+		int maxLineLength = 0;
 		List<String> imageLines = Files.readAllLines(imagePath);
 		for (int r = 0; r < imageLines.size(); ++r) {
 			String line = imageLines.get(r);
+			maxLineLength = Math.max(maxLineLength, line.length());
 			for (int c = 0; c < line.length(); ++c) {
 				char t = line.charAt(c);
 				SVGSymbolElement symbol = symbols.get(t);
@@ -85,6 +87,8 @@ public final class Main {
 				doc.getDocumentElement().appendChild(instance);
 			}
 		}
+		doc.getRootElement().setAttributeNS(null, "viewBox", String.format("0 0 %s %s", (maxLineLength+1)*tileWidth, (imageLines.size()+1)*tileHeight));
+		doc.getRootElement().setAttributeNS(null, "preserveAspectRatio", "xMinYMin meet");
 
 		SVGTranscoder transcoder = new SVGTranscoder();
 		try (Writer w = Files.newBufferedWriter(outputPath)) {
