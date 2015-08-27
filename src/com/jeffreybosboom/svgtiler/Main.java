@@ -101,11 +101,8 @@ public final class Main {
 		Map<Character, SVGSymbolElement> symbols = new HashMap<>();
 		int counter = 0;
 		for (String line : Files.readAllLines(path)) {
-			int fieldSep = line.indexOf(' ');
-			String symbol = line.substring(0, fieldSep);
-			if (symbol.length() != 1)
-				throw new RuntimeException("bad symbol: "+symbol);
-			String elementStr = line.substring(fieldSep+1).trim();
+			String symbol = line.substring(0, 1);
+			String elementStr = line.substring(2).trim();
 
 			SVGSVGElement subdoc;
 			if (elementStr.startsWith("@")) {
